@@ -8,22 +8,28 @@ import subprocess
 
 # ---------- Flask app ----------
 app = Flask(__name__)
+# تمكين CORS لجميع الأصول، لضمان اتصال الفرونت إند بالباك إند
 CORS(app)
 
 # ---------- Gemini setup ----------
-# حاول قراءة مفتاح API من Environment Variable أولاً
-GEMINI_API_KEY = os.environ.get("AIzaSyB7nN_7JLZeB5Fmqgqe3qfZWRyJbb3_sAU", "")
+# قراءة مفتاح API من Environment Variable مباشرة (GEMINI_API_KEY)
+# يجب أن تضع هذا المفتاح في إعدادات Render (Service Settings -> Environment)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
 try:
     import google.generativeai as genai
     if GEMINI_API_KEY:
         genai.configure(api_key=GEMINI_API_KEY)
     genai_client = genai
 except Exception:
+    # سيتم تشغيل هذا إذا فشل استيراد الحزمة أو التهيئة
     genai_client = None
 
 # ---------- Utility: run code safely ----------
 def execute_code(code: str, language: str, timeout: int = 5):
+    """ينفذ الكود البرمجي في بيئة معزولة ومؤقتة."""
     start = time.time()
+    # استخدام اسم ملف مؤقت لكتابة الكود
     with tempfile.NamedTemporaryFile(mode='w', suffix=('.py' if language == 'python' else '.js'), delete=False) as f:
         f.write(code)
         fname = f.name
@@ -36,6 +42,7 @@ def execute_code(code: str, language: str, timeout: int = 5):
         return {"stdout":"", "stderr": f"Unsupported language: {language}", "returncode": -1, "timed_out": False, "runtime_ms": 0}
 
     try:
+        # تنفيذ الكود مع تحديد مهلة (Timeout)
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         stdout = proc.stdout or ""
         stderr = proc.stderr or ""
@@ -48,10 +55,11 @@ def execute_code(code: str, language: str, timeout: int = 5):
         timed_out = True
     except Exception as e:
         stdout = ""
-        stderr = f"Execution failed: {str(e)}"
+        stderr = f"Execution failed: {str(e)} (Check if 'python3' or 'node' are available on the server)"
         returncode = -1
         timed_out = False
     finally:
+        # حذف الملف المؤقت بعد التنفيذ
         try:
             os.remove(fname)
         except:
@@ -62,11 +70,14 @@ def execute_code(code: str, language: str, timeout: int = 5):
 
 # ---------- Helper: call Gemini ----------
 def call_gemini(prompt: str, model: str = "gemini-2.5-flash"):
+    """يتصل بواجهة برمجة تطبيقات Gemini لتوليد النصوص."""
     if genai_client is None:
-        return {"error": "Gemini client not configured on server."}
+        return {"error": "Gemini client not configured on server. Check API Key."}
     try:
-        res = genai_client.generate_text(model=model, prompt=prompt)
-        text = getattr(res, "result", None) or getattr(res, "text", None) or str(res)
+        # ملاحظة: تم تعديل طريقة الاتصال لاستخدام generate_content بدلاً من generate_text
+        # لضمان التوافق مع أحدث إصدارات مكتبة Google GenAI
+        res = genai_client.models.generate_content(model=model, contents=prompt)
+        text = res.text
         return {"text": text}
     except Exception as e:
         return {"error": f"Gemini call failed: {e}"}
@@ -96,7 +107,7 @@ def api_ai_check():
     prompt = (
         "You are a professional programming assistant. Analyze the following code for bugs and style issues. "
         "Provide corrected code and explanation in Arabic.\n\n"
-        f"{code}"
+        f"```{language}\n{code}\n```"
     )
     return jsonify(call_gemini(prompt))
 
