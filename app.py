@@ -39,7 +39,7 @@ from flask_cors import CORS
 # official-looking SDK surface. Depending on your installed package, adjust imports.
 #
 # Recommended: set GEMINI_API_KEY in the Replit/environ settings.
-GEMINI_API_KEY = os.environ.get("AIzaSyB7nN_7JLZeB5Fmqgqe3qfZWRyJbb3_sAU", "")  # <<-- set this in your deploy environment
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")  # <<-- set this in your deploy environment
 
 # We'll attempt to import the "google" genai client as used by official docs.
 # There are several older/newer python packages; this tries to support common cases.
