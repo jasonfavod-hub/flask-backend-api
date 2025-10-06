@@ -1,4 +1,4 @@
-Flask==2.3.2
-requests==2.31.0
-flask-cors==4.1.2
-google-generativeai==0.4.0
+Flask
+requests
+flask-cors
+google-generativeai
